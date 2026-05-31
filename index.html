@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NVIDIA Safety Audit Form</title>
+<style>
+  :root {
+    --critical:#dc2626;--high:#ea580c;--medium:#d97706;--low:#16a34a;
+    --bg:#f1f5f9;--card:#fff;--border:#e2e8f0;--text:#0f172a;
+    --muted:#64748b;--accent:#1d4ed8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:15px;padding-bottom:80px;}
+
+  .topbar{background:#1e3a5f;color:#fff;padding:14px 20px;position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,.25);}
+  .topbar h1{font-size:16px;font-weight:800;}
+  .topbar-sub{font-size:11px;opacity:.7;margin-top:1px;}
+
+  .page{max-width:680px;margin:0 auto;padding:16px;}
+
+  /* CARD */
+  .card{background:var(--card);border-radius:12px;border:1px solid var(--border);padding:18px;margin-bottom:14px;}
+  .card-title{font-size:14px;font-weight:800;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+
+  /* FORM */
+  .form-group{margin-bottom:13px;}
+  .form-group label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+  .form-group select,.form-group input,.form-group textarea{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;background:#fff;color:var(--text);-webkit-appearance:none;}
+  .form-group select:focus,.form-group input:focus,.form-group textarea:focus{outline:none;border-color:var(--accent);}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  @media(max-width:480px){.form-row{grid-template-columns:1fr;}}
+  .area-preview{font-size:11px;color:var(--accent);font-weight:600;margin-top:5px;min-height:16px;}
+
+  /* SEVERITY */
+  .sev-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+  .sev-btn{padding:9px 4px;border:2px solid var(--border);border-radius:8px;text-align:center;cursor:pointer;font-size:12px;font-weight:700;background:#fff;transition:.15s;user-select:none;}
+  .sev-btn[data-v=Critical].sel{background:#fee2e2;border-color:var(--critical);color:var(--critical);}
+  .sev-btn[data-v=High].sel{background:#ffedd5;border-color:var(--high);color:var(--high);}
+  .sev-btn[data-v=Medium].sel{background:#fef3c7;border-color:var(--medium);color:var(--medium);}
+  .sev-btn[data-v=Low].sel{background:#dcfce7;border-color:var(--low);color:var(--low);}
+
+  /* CHECKLIST */
+  .cat-header{background:#f8fafc;border-radius:8px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;border:1px solid var(--border);}
+  .cat-header-left{display:flex;align-items:center;gap:8px;font-weight:800;font-size:14px;}
+  .cat-meta{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px;}
+  .fail-badge{background:#fee2e2;color:var(--critical);font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;}
+  .chevron{font-size:12px;transition:transform .2s;color:var(--muted);}
+  .cat-body{display:none;}
+  .cat-body.open{display:block;}
+
+  .ci{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);margin-bottom:6px;background:#fafafa;transition:.15s;}
+  .ci.fail{background:#fff8f8;border-color:#fca5a5;}
+  .ci.pass{background:#f0fdf4;border-color:#86efac;}
+  .ci.na{opacity:.55;}
+  .ci-btns{display:flex;flex-direction:column;gap:4px;flex-shrink:0;}
+  .tb{width:32px;height:32px;border-radius:7px;border:1.5px solid var(--border);background:#fff;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s;}
+  .tb:active{transform:scale(.9);}
+  .tb.ap{background:#dcfce7;border-color:#16a34a;}
+  .tb.af{background:#fee2e2;border-color:#dc2626;}
+  .tb.an{background:#f1f5f9;border-color:#94a3b8;}
+  .ci-body{flex:1;min-width:0;}
+  .ci-text{font-size:13px;line-height:1.45;font-weight:500;}
+  .ci-note{margin-top:6px;}
+  .ci-note input{width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;background:#fff;}
+  .ci-note input:focus{outline:none;border-color:var(--accent);}
+
+  /* PROGRESS */
+  .prog-bar-wrap{background:var(--border);border-radius:4px;height:5px;margin:8px 0;}
+  .prog-bar{height:5px;border-radius:4px;background:var(--accent);transition:width .3s;}
+  .prog-label{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;}
+
+  /* SUBMIT FOOTER */
+  .footer{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);padding:12px 16px;display:flex;gap:10px;align-items:center;z-index:100;}
+  .submit-btn{flex:1;padding:13px;background:#1d4ed8;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;transition:.15s;}
+  .submit-btn:hover{background:#1e40af;}
+  .submit-btn:disabled{background:#94a3b8;cursor:not-allowed;}
+  .prog-summary{font-size:12px;color:var(--muted);text-align:right;white-space:nowrap;}
+
+  /* TOAST */
+  .toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:300;opacity:0;transition:opacity .3s;pointer-events:none;}
+  .toast.show{opacity:1;}
+
+  /* SUCCESS SCREEN */
+  .success-screen{display:none;text-align:center;padding:40px 20px;}
+  .success-screen.show{display:block;}
+  .success-icon{font-size:60px;margin-bottom:16px;}
+  .success-title{font-size:20px;font-weight:800;margin-bottom:8px;}
+  .success-sub{font-size:14px;color:var(--muted);margin-bottom:24px;}
+  .dl-btn{display:inline-block;padding:14px 28px;background:#16a34a;color:#fff;border-radius:10px;font-size:15px;font-weight:800;text-decoration:none;cursor:pointer;border:none;}
+  .new-btn{display:inline-block;margin-top:12px;padding:11px 24px;background:#f1f5f9;color:var(--text);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;border:1px solid var(--border);}
+
+  .tip-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;font-size:12px;color:#1e40af;margin-bottom:14px;}
+  .tip-box strong{font-weight:700;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1>🔬 NVIDIA Safety Audit</h1>
+    <div class="topbar-sub" id="headerSub">Field Audit Form</div>
+  </div>
+  <div style="font-size:20px;">🛡️</div>
+</div>
+
+<div class="page">
+
+  <div id="mainForm">
+    <div class="tip-box">
+      <strong>How it works:</strong> Fill in location + your name, then go through each checklist category. Tap ✅ Pass · ❌ Fail · ➖ N/A. Add notes to failures. Submit at the bottom → a JSON file downloads → drop it in your OneDrive Audits folder → import into the dashboard.
+    </div>
+
+    <!-- Location -->
+    <div class="card">
+      <div class="card-title">📍 Audit Location</div>
+      <div class="form-group">
+        <label>Building</label>
+        <select id="f-building" onchange="updateFloors()">
+          <option value="">— Select Building —</option>
+          <option>ShlomoA</option><option>Tavor</option><option>IBC</option><option>Raanana</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Floor</label>
+          <select id="f-floor" onchange="updateLabs()" disabled><option value="">— Floor —</option></select>
+        </div>
+        <div class="form-group">
+          <label>Lab</label>
+          <select id="f-lab" onchange="updateAreaCode()" disabled><option value="">— Lab —</option></select>
+        </div>
+      </div>
+      <div class="area-preview" id="areaPreview"></div>
+    </div>
+
+    <!-- Auditor -->
+    <div class="card">
+      <div class="card-title">👤 Auditor Details</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Your Name</label>
+          <input type="text" id="f-auditor" placeholder="Full name">
+        </div>
+        <div class="form-group">
+          <label>Audit Date</label>
+          <input type="date" id="f-date">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Default Severity for Failures</label>
+        <div class="sev-row">
+          <div class="sev-btn" data-v="Critical" onclick="selSev(this)">🔴 Critical</div>
+          <div class="sev-btn sel" data-v="High" onclick="selSev(this)">🟠 High</div>
+          <div class="sev-btn" data-v="Medium" onclick="selSev(this)">🟡 Medium</div>
+          <div class="sev-btn" data-v="Low" onclick="selSev(this)">🟢 Low</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Checklist -->
+    <div id="checklistArea"></div>
+
+    <!-- General notes -->
+    <div class="card">
+      <div class="card-title">📝 General Notes</div>
+      <div class="form-group" style="margin:0;">
+        <textarea id="f-notes" placeholder="Any overall observations for this audit…" style="min-height:80px;"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Success -->
+  <div class="success-screen" id="successScreen">
+    <div class="success-icon">✅</div>
+    <div class="success-title">Audit Submitted!</div>
+    <div class="success-sub" id="successMsg">Your audit file is ready.</div>
+    <button class="dl-btn" id="dlBtn" onclick="triggerDownload()">📥 Download Audit JSON</button>
+    <br>
+    <div style="font-size:12px;color:var(--muted);margin-top:16px;max-width:340px;margin-left:auto;margin-right:auto;line-height:1.6;">
+      Save this file to your <strong>OneDrive / Safety Audits</strong> folder, then open the dashboard on your PC and click <strong>📥 Import Audit</strong>.
+    </div>
+    <br>
+    <button class="new-btn" onclick="resetForm()">Start New Audit</button>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<div class="footer" id="footerBar">
+  <div class="prog-summary" id="progSummary">0 / 0 evaluated</div>
+  <button class="submit-btn" onclick="submitAudit()" id="submitBtn">Submit Audit →</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══ DATA ══
+const LAB_DATA = [
+  {building:'ShlomoA',floor:'2',lab:'HCA',areaCodes:['YOA-02-1000 | HCA LAB']},
+  {building:'ShlomoA',floor:'2',lab:'Sustain',areaCodes:['YOA-02-1012 | Sustain']},
+  {building:'ShlomoA',floor:'2',lab:'NVLink',areaCodes:['YOA-02-1013 | HARDWARE LAB']},
+  {building:'ShlomoA',floor:'2',lab:'HW Shared v2',areaCodes:['ISR002MA-2-1025 | HW Shared Rack Room and Lab','ISR002MA-2-1034','ISR002MA-2-1035']},
+  {building:'ShlomoA',floor:'2',lab:'Thermal',areaCodes:['YOA-02-1009 | Thermal']},
+  {building:'ShlomoA',floor:'2',lab:'WH',areaCodes:['YOA-02-1021 | WH']},
+  {building:'ShlomoA',floor:'P3',lab:'Thermal Lab',areaCodes:['YOA-P3-114C','YOA-P3-114B','YOA-P3-112B']},
+  {building:'ShlomoA',floor:'P3',lab:'Mech',areaCodes:['YOA-P3-108 | INTERCONNECT PCC LAB']},
+  {building:'ShlomoA',floor:'Ground',lab:'Clean Room 1',areaCodes:['YOA-GF-1030 | Clean Room 1']},
+  {building:'ShlomoA',floor:'Ground',lab:'Clean Room 2',areaCodes:['YOA-GF-1022 | Clean Room 2']},
+  {building:'ShlomoA',floor:'1',lab:'Optics',areaCodes:['YOA-01-1044 | OPTICAL LAB']},
+  {building:'Tavor',floor:'Ground',lab:'106A - Workshop',areaCodes:['YOT-GF-106A | MECHANICAL WORKSHOP']},
+  {building:'Tavor',floor:'Ground',lab:'106 - Eng Lab',areaCodes:['YOT-GF-106 | ENG LAB']},
+  {building:'Tavor',floor:'Ground',lab:'107 - Climatic Lab',areaCodes:['YOT-GF-107 | CLIMATIC LAB 3']},
+  {building:'Tavor',floor:'Ground',lab:'109 - Mech Lab',areaCodes:['YOT-GF-109 | MECHANICAL LAB']},
+  {building:'Tavor',floor:'Ground',lab:'109A - Interconnect Lab',areaCodes:['YOT-GF-109A | INTERCONNECT LAB']},
+  {building:'Tavor',floor:'Ground',lab:'110 - Large Assembly',areaCodes:['YOT-GF-110']},
+  {building:'Tavor',floor:'TBD',lab:'Mech and CPO',areaCodes:['TBD']},
+  {building:'IBC',floor:'-1',lab:'EMI',areaCodes:['YOI-B1-100 | EMI LAB','YOI-B1-100A','YOI-B1-101 | S&V LAB','YOI-B1-101A | EMI OPERATORS']},
+  {building:'IBC',floor:'-1',lab:'EMC',areaCodes:['YOI-B1-102 | IMMUNITY LABS + SAFETY LABS','YOI-B1-103 | CLIMATIC ENVIRONMENTAL LAB 1']},
+  {building:'IBC',floor:'-1',lab:'CT',areaCodes:['YOI-B1-104 | CONTROL ROOM']},
+  {building:'IBC',floor:'-1',lab:'Shared Control Room',areaCodes:['YOI-B1-105 | MAIN S&V LAB']},
+  {building:'IBC',floor:'-1',lab:'S&V',areaCodes:['YOI-B1-106 | S&V LAB']},
+  {building:'IBC',floor:'2',lab:'FA',areaCodes:['YOI-02-108 | FAILURE ANALYSIS (FA) LAB','YOI-02-109 | FAILURE ANALYSIS (FA) LAB','YOI-02-109A | FA WH']},
+  {building:'IBC',floor:'2',lab:'TM',areaCodes:['YOI-02-111 | THERMAL LAB (TM)']},
+  {building:'IBC',floor:'2',lab:'SLT / E2E',areaCodes:['YOI-02-112 | RACK ROOM']},
+  {building:'IBC',floor:'2',lab:'LINKX',areaCodes:['YOI-02-113 | HS LINKX LAB']},
+  {building:'IBC',floor:'2',lab:'QFT',areaCodes:['YOI-02-114 | QFT SYSTEMS']},
+  {building:'IBC',floor:'2',lab:'EV',areaCodes:['YOI-02-115 | CONTROL ROOM 2']},
+  {building:'IBC',floor:'2',lab:'CLIMATIC - OLD',areaCodes:['YOI-02-116 | CLIMATIC ENVIRONMENTAL LAB']},
+  {building:'IBC',floor:'2',lab:'CLIMATIC - New',areaCodes:['YOI-02-118 | NEW CLIMATIC ENVIRONMENTAL LAB']},
+  {building:'IBC',floor:'2',lab:'Work Shop',areaCodes:['YOI-02-119 | ENG LAB']},
+  {building:'IBC',floor:'2',lab:'Warehouse',areaCodes:['YOI-02-120 | WH']},
+  {building:'IBC',floor:'2',lab:'Mech Lab',areaCodes:['YOI-02-121 | QUAL LIQUID LAB']},
+  {building:'IBC',floor:'2',lab:'MQA',areaCodes:['YOI-02-122 | MQA LAB']},
+  {building:'IBC',floor:'2',lab:'Warehouse - Office',areaCodes:['YOI-02-124 | DISTRIBUTION AREA']},
+  {building:'IBC',floor:'2',lab:'Safety',areaCodes:['YOI-02-125 | NFI ROBOT - Safety Lab']},
+  {building:'IBC',floor:'2',lab:'Immersion Cooling',areaCodes:['YOI-02-117 | IMMERSION LAB']},
+  {building:'IBC',floor:'3',lab:'Qual - SW',areaCodes:['YOI-03-118 | QUAL-SW-LAB']},
+  {building:'IBC',floor:'5',lab:'EV Compliance Lab',areaCodes:['YOI-05-120 | EV Compliance Lab']},
+  {building:'Raanana',floor:'6',lab:'HW Switch Lab',areaCodes:['RAA-06-111 | HW SWITCH LAB']},
+  {building:'Raanana',floor:'6',lab:'HW Lab',areaCodes:['RAA-06-112 | HW LAB']},
+  {building:'Raanana',floor:'7',lab:'HW Lab (7)',areaCodes:['RAA-07-113 | HW LAB']},
+  {building:'Raanana',floor:'B2',lab:'HW (B2)',areaCodes:['RAA-B2-1014 | HW']},
+];
+
+const AUDIT_CATEGORIES = [
+  {id:'signage',name:'Lab Entrance Signage Hazards/Safety',icon:'🪧',items:['Authorized access only','No food or drink','Type of chemicals','Lab supervisor details','First aid signage is visible and contains details of first aid officers for the area.']},
+  {id:'general',name:'General Safety',icon:'🏠',items:['The general area is tidy and free of obstruction and mess.','Spaces between and under benches, cabinets and equipment are accessible for cleaning.','Walkways/floor areas are clear of obstructions and trip hazards (e.g. electrical cords).','Stair treads are in good condition (no worn or broken treads).','Lighting adequate and operational','Temperature is comfortable','Area is free from odours','Noise level is acceptable or controlled to an adequate level','Ventilation is adequate','Facilities for the storage of outer garments and personal items are available outside the room.']},
+  {id:'electrical',name:'Electrical',icon:'⚡',items:['Electrical equipment tested, tagged and in date.','Extension leads / power boards are used as designed (no temporary or makeshift leads/power boards, double adaptors, overloading).','No daisy-chaining of extension cords or power strip','No usage of power extension cord','No usage of power cords that has two different types of connectors (for example C13 and C19)','No PS without finger proof','No more than one electrical wire fitted inside connector','All cables that are connected to connector must be pressed with dedicated tool (according to connector definition)','No connection of cable to connector without shrink/isolation','No more than one connector is allowed to be screwed at one location (Busbar/PS)','No cables on sharp metal edges','No connection of cables with Luster connector','PSU must be connected with a suitable cable: AWG and length','Products and sockets above 25A must have interlock (no connection or socket above 25A without interlock)','No overload current from PDU/Socket','No rack/table without ground','Electrical panels and circuit breakers are accessible and clearly labeled (min 36" / 91cm clearance)','Emergency power-off (EPO) switches are accessible, labeled, and unobstructed','Ground Fault Circuit Interrupter (GFCI) protection on outlets near water sources or wet areas','Exposed live electrical parts are properly guarded or enclosed (no missing covers on junction boxes, panels, outlets)','High-voltage areas are marked with appropriate warning signage','Lockout/Tagout (LOTO) procedures and devices are available for electrical maintenance','Personnel working on energized equipment have appropriate training and PPE (arc-flash rated where applicable)','All power leads, outlets, switches and wiring in good condition — no exposed/frayed wiring; damaged cables removed from service immediately']},
+  {id:'manual',name:'Hazardous Manual Tasks',icon:'🏋️',items:['Frequently used items within easy reach between knee and shoulder height, heavy items stored at waist height.','Step ladders or stools are accessible to access items stored on high shelves if required and are in good condition.','Materials handling equipment available for heavy or awkward items and loads']},
+  {id:'chemical',name:'Chemical Storage',icon:'🧪',items:['Chemical containers are properly labeled with contents and hazards','Chemicals are segregated and stored by hazard class','Flammable liquids are stored in flammable cabinets','Chemicals are not stored on the floor or near exits','Chemical waste containers are properly labeled and segregated']},
+  {id:'ppe',name:'Personal Protective Equipment',icon:'🦺',items:['PPE is available and in good condition.','PPE is stored appropriately.','Signage of PPE requirements displayed.']},
+];
+
+// ══ STATE ══
+let sevSel='High';
+let state={}; // key: catId_idx → {s:'pass'|'fail'|'na', note:''}
+let auditPayload=null;
+
+// ══ LOCATION ══
+function getFloors(b){return[...new Set(LAB_DATA.filter(r=>r.building===b).map(r=>r.floor))];}
+function getLabs(b,f){return LAB_DATA.filter(r=>r.building===b&&r.floor===f);}
+function updateFloors(){
+  const b=document.getElementById('f-building').value;
+  const fSel=document.getElementById('f-floor'),lSel=document.getElementById('f-lab');
+  fSel.innerHTML='<option value="">— Floor —</option>';lSel.innerHTML='<option value="">— Lab —</option>';
+  document.getElementById('areaPreview').textContent='';
+  fSel.disabled=!b;lSel.disabled=true;
+  if(!b)return;
+  getFloors(b).forEach(f=>{const o=document.createElement('option');o.value=f;o.textContent='Floor '+f;fSel.appendChild(o);});
+  document.getElementById('headerSub').textContent=b+' — choose floor';
+}
+function updateLabs(){
+  const b=document.getElementById('f-building').value,f=document.getElementById('f-floor').value;
+  const lSel=document.getElementById('f-lab');
+  lSel.innerHTML='<option value="">— Lab —</option>';lSel.disabled=!f;
+  document.getElementById('areaPreview').textContent='';
+  if(!f)return;
+  getLabs(b,f).forEach(r=>{const o=document.createElement('option');o.value=r.lab;o.textContent=r.lab;lSel.appendChild(o);});
+}
+function updateAreaCode(){
+  const b=document.getElementById('f-building').value,f=document.getElementById('f-floor').value,l=document.getElementById('f-lab').value;
+  const prev=document.getElementById('areaPreview');
+  if(!l){prev.textContent='';return;}
+  const rec=LAB_DATA.find(r=>r.building===b&&r.floor===f&&r.lab===l);
+  prev.textContent=rec?'📍 '+rec.areaCodes.join(' · '):'';
+  document.getElementById('headerSub').textContent=b+' · '+l;
+}
+
+// ══ SEVERITY ══
+function selSev(el){document.querySelectorAll('.sev-btn').forEach(b=>b.classList.remove('sel'));el.classList.add('sel');sevSel=el.dataset.v;}
+
+// ══ CHECKLIST ══
+function renderChecklist(){
+  const area=document.getElementById('checklistArea');
+  area.innerHTML=AUDIT_CATEGORIES.map(cat=>{
+    const fails=cat.items.filter((_,i)=>(state[cat.id+'_'+i]||{}).s==='fail').length;
+    const done=cat.items.filter((_,i)=>(state[cat.id+'_'+i]||{}).s).length;
+    const pct=cat.items.length?Math.round(done/cat.items.length*100):0;
+    return `<div class="card" style="padding:0;overflow:hidden;margin-bottom:14px;">
+      <div class="cat-header" onclick="toggleCat('${cat.id}')">
+        <div class="cat-header-left"><span>${cat.icon}</span><span>${cat.name}</span></div>
+        <div class="cat-meta">
+          ${fails?`<span class="fail-badge">❌ ${fails}</span>`:''}
+          <span>${done}/${cat.items.length}</span>
+          <span class="chevron" id="chev-${cat.id}">▼</span>
+        </div>
+      </div>
+      <div style="padding:0 14px 2px;background:#fff;" id="cat-progress-${cat.id}">
+        <div class="prog-label"><span></span><span>${pct}%</span></div>
+        <div class="prog-bar-wrap"><div class="prog-bar" style="width:${pct}%"></div></div>
+      </div>
+      <div class="cat-body open" id="catbody-${cat.id}" style="padding:12px 14px 14px;">
+        ${cat.items.map((item,idx)=>{
+          const key=cat.id+'_'+idx;
+          const s=(state[key]||{}).s||'';
+          const note=(state[key]||{}).note||'';
+          return `<div class="ci ${s}" id="ci-${key}">
+            <div class="ci-btns">
+              <button class="tb ${s==='pass'?'ap':''}" onclick="setItem('${key}','pass',event)" title="Pass">✅</button>
+              <button class="tb ${s==='fail'?'af':''}" onclick="setItem('${key}','fail',event)" title="Fail">❌</button>
+              <button class="tb ${s==='na'?'an':''}" onclick="setItem('${key}','na',event)" title="N/A">➖</button>
+            </div>
+            <div class="ci-body">
+              <div class="ci-text">${esc(item)}</div>
+              ${s==='fail'?`<div class="ci-note"><input type="text" placeholder="Describe the issue…" value="${esc(note)}" oninput="setNote('${key}',this.value)" onclick="event.stopPropagation()"></div>`:''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  updateProgress();
+}
+
+function toggleCat(id){
+  const body=document.getElementById('catbody-'+id);
+  const chev=document.getElementById('chev-'+id);
+  const isOpen=body.classList.contains('open');
+  body.classList.toggle('open');
+  chev.style.transform=isOpen?'rotate(-90deg)':'rotate(0)';
+}
+
+function setItem(key,s,e){
+  e.stopPropagation();
+  if(!state[key])state[key]={s:'',note:''};
+  state[key].s=state[key].s===s?'':s;
+  if(state[key].s!=='fail')state[key].note='';
+  renderChecklist();
+}
+function setNote(key,val){if(!state[key])state[key]={s:'fail',note:''};state[key].note=val;}
+
+function updateProgress(){
+  const total=AUDIT_CATEGORIES.reduce((a,c)=>a+c.items.length,0);
+  const done=Object.values(state).filter(s=>s.s).length;
+  const fails=Object.values(state).filter(s=>s.s==='fail').length;
+  document.getElementById('progSummary').textContent=`${done}/${total} evaluated · ${fails} fail${fails!==1?'s':''}`;
+}
+
+// ══ SUBMIT ══
+function submitAudit(){
+  const b=document.getElementById('f-building').value;
+  const f=document.getElementById('f-floor').value;
+  const l=document.getElementById('f-lab').value;
+  const auditor=document.getElementById('f-auditor').value.trim();
+  if(!b||!f||!l){toast('Select Building → Floor → Lab first.');return;}
+  if(!auditor){toast('Enter your name.');return;}
+
+  const date=document.getElementById('f-date').value||new Date().toISOString().slice(0,10);
+  const rec=LAB_DATA.find(r=>r.building===b&&r.floor===f&&r.lab===l);
+  const areaCode=rec?rec.areaCodes[0]:'';
+  const totalItems=AUDIT_CATEGORIES.reduce((a,c)=>a+c.items.length,0);
+  const evaluated=Object.values(state).filter(s=>s.s).length;
+
+  const findings=[];
+  AUDIT_CATEGORIES.forEach(cat=>{
+    cat.items.forEach((item,idx)=>{
+      const key=cat.id+'_'+idx;
+      const s=state[key]||{};
+      findings.push({
+        checkItem:item,
+        category:cat.name,
+        status:s.s||'not_evaluated',
+        note:s.note||'',
+      });
+    });
+  });
+
+  auditPayload={
+    auditId:'AUD-'+Date.now().toString(36).toUpperCase(),
+    version:'1.0',
+    timestamp:new Date().toISOString(),
+    date,
+    building:b,
+    floor:f,
+    lab:l,
+    areaCode,
+    auditor,
+    severity:sevSel,
+    generalNotes:document.getElementById('f-notes').value.trim(),
+    summary:{
+      totalItems,
+      evaluated,
+      passed:Object.values(state).filter(s=>s.s==='pass').length,
+      failed:Object.values(state).filter(s=>s.s==='fail').length,
+      na:Object.values(state).filter(s=>s.s==='na').length,
+    },
+    findings,
+  };
+
+  const failCount=auditPayload.summary.failed;
+  document.getElementById('successMsg').textContent=
+    `${failCount} failure${failCount!==1?'s':''} found out of ${evaluated} items evaluated in ${b} · Floor ${f} · ${l}`;
+
+  document.getElementById('mainForm').style.display='none';
+  document.getElementById('footerBar').style.display='none';
+  document.getElementById('successScreen').classList.add('show');
+  triggerDownload();
+}
+
+function getFilename(){
+  return `audit-${auditPayload.date}-${auditPayload.building}-${auditPayload.lab.replace(/[^a-zA-Z0-9]/g,'-')}.json`;
+}
+
+async function triggerDownload(){
+  if(!auditPayload) return;
+  const json=JSON.stringify(auditPayload,null,2);
+  const fname=getFilename();
+
+  // Try File System Access API — lets user pick save location (defaults to same folder)
+  if(window.showSaveFilePicker){
+    try{
+      const fh=await window.showSaveFilePicker({
+        suggestedName:fname,
+        types:[{description:'Audit JSON',accept:{'application/json':['.json']}}],
+      });
+      const writable=await fh.createWritable();
+      await writable.write(json);
+      await writable.close();
+      document.getElementById('dlBtn').textContent='✅ File Saved!';
+      document.getElementById('dlBtn').disabled=true;
+      return;
+    }catch(err){
+      if(err.name==='AbortError') return;
+      // fall through to auto-download
+    }
+  }
+  // Fallback for browsers without File System Access API
+  const blob=new Blob([json],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=fname;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+
+function resetForm(){
+  state={};auditPayload=null;
+  ['f-building','f-floor','f-lab','f-auditor','f-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-floor').disabled=true;document.getElementById('f-lab').disabled=true;
+  document.getElementById('areaPreview').textContent='';
+  document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('headerSub').textContent='Field Audit Form';
+  document.getElementById('mainForm').style.display='block';
+  document.getElementById('footerBar').style.display='flex';
+  document.getElementById('successScreen').classList.remove('show');
+  selSev(document.querySelector('.sev-btn[data-v=High]'));
+  renderChecklist();
+  window.scrollTo(0,0);
+}
+
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2500);}
+
+// ── INIT ──
+document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
+renderChecklist();
+</script>
+</body>
+</html>
