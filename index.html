@@ -175,6 +175,7 @@
     <div class="success-icon">✅</div>
     <div class="success-title">Audit Submitted!</div>
     <div class="success-sub" id="successMsg">Your audit file is ready.</div>
+    <div id="uploadStatus" style="font-size:14px;font-weight:700;color:#15803d;margin-bottom:16px;min-height:22px;"></div>
     <button class="dl-btn" id="dlBtn" onclick="triggerDownload()">📥 Download Audit JSON</button>
     <br>
     <div style="font-size:12px;color:var(--muted);margin-top:16px;max-width:340px;margin-left:auto;margin-right:auto;line-height:1.6;">
@@ -415,7 +416,26 @@ function submitAudit(){
   document.getElementById('mainForm').style.display='none';
   document.getElementById('footerBar').style.display='none';
   document.getElementById('successScreen').classList.add('show');
-  triggerDownload();
+
+  // Try auto-upload to Google Drive
+  if (APPS_SCRIPT_URL) {
+    document.getElementById('uploadStatus').textContent = '☁️ Saving to Google Drive…';
+    uploadToGoogleDrive(auditPayload).then(result => {
+      if (result.status === 'ok') {
+        document.getElementById('uploadStatus').textContent = '✅ Saved to Google Drive automatically!';
+        document.getElementById('dlBtn').style.display = 'none'; // hide manual download
+      } else if (result.status === 'duplicate') {
+        document.getElementById('uploadStatus').textContent = '✅ Already saved to Google Drive.';
+        document.getElementById('dlBtn').style.display = 'none';
+      } else {
+        document.getElementById('uploadStatus').textContent = '⚠️ Drive upload failed — download the file below.';
+        triggerDownload();
+      }
+    });
+  } else {
+    document.getElementById('uploadStatus').textContent = '';
+    triggerDownload();
+  }
 }
 
 function getFilename(){
@@ -469,6 +489,28 @@ function resetForm(){
 
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2500);}
+
+// ══ APPS SCRIPT SYNC ══
+// Paste your Apps Script Web App URL here after deploying audit-sync.gs
+const APPS_SCRIPT_URL = 'https://script.google.com/a/macros/nvidia.com/s/AKfycbwhne2Y997ThmWYkpNwR2OG_Attjtuwwwici8k0AC8rvkx0waldql5UC0yew5cfTxV4TQ/exec';
+
+async function uploadToGoogleDrive(payload) {
+  if (!APPS_SCRIPT_URL) return { status: 'no_url' };
+  try {
+    // Apps Script POST — use text/plain to avoid CORS preflight
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'cors',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain' }, // avoids preflight
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } catch (err) {
+    return { status: 'error', message: err.toString() };
+  }
+}
 
 // ── INIT ──
 document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
